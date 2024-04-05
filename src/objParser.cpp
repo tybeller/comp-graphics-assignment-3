@@ -3,6 +3,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <sstream>
+#include <iostream>
 //#include <unordered_map>
 
 /*struct colorLib {
@@ -38,7 +39,7 @@ int parseMaterials(std::string name, colorLib& cl) {
     }
 }*/
 
-void parseFile(std::string name, std::vector<float>& outVect, std::vector<unsigned int>& outIndices) {
+void parseFile(std::string name, std::vector<float>& outVect, std::vector<unsigned int>& outIndices, std::vector<float>& outNormalsVect, std::vector<unsigned int>& outNormalsIndices) {
     //colorLib cl;
     std::ifstream objFile;
 
@@ -53,8 +54,9 @@ void parseFile(std::string name, std::vector<float>& outVect, std::vector<unsign
 
     std::vector<glm::vec3> verticies;
     //std::vector<glm::vec2> uvs;
-    //std::vector<glm::vec3> normals;
+    std::vector<glm::vec3> normals;
     std::vector<std::vector<int>> faces;
+    std::vector<std::vector<int>> facesNormals;
     //glm::vec3 currColor = vec3(1.0f, 0.0f, 0.0f);
     
     while (getline(objFile, line)) {
@@ -86,31 +88,54 @@ void parseFile(std::string name, std::vector<float>& outVect, std::vector<unsign
             uvs.push_back(uv);
         }*/
         //vertex normals eg "vn -1.000000 -1.000000 1.000000"
-        //else if (lineHeader == "vn") {
-        //    glm::vec3 normal;
-        //    lineStream >> normal.x >> normal.y >> normal.z;
-        //    normals.push_back(normal);
-        //}
+        else if (lineHeader == "vn") {
+            glm::vec3 normal;
+            lineStream >> normal.x >> normal.y >> normal.z;
+            outNormalsVect.insert(outNormalsVect.end(), {normal.x, normal.y, normal.z});
+        }
         
         //faces eg "f 4//4 3//3 2//2 1//1 ..." or "f 4/4/4 3/3/3 2/2/2 1/1/1 ..."
         else if (lineHeader == "f") {
             std::vector<int> face;
+            std::vector<int> normal;
             std::string faceIndex;
             while (lineStream >> faceIndex) {
                 //push back the first int in this string before the /
                 face.push_back(std::stoi(faceIndex.substr(0, faceIndex.find('/'))) - 1);
+                
+                //find the last int 
+                std::string afterFirstSlash = faceIndex.substr(faceIndex.find('/') + 1, faceIndex.size());
+                if(afterFirstSlash.size() > 1) {
+                    normal.push_back(std::stoi(afterFirstSlash.substr(afterFirstSlash.find('/') + 1, faceIndex.size())));
+                }
+
             }
             faces.push_back(face);
+            facesNormals.push_back(normal);
         }
     }
     
 
     //now process the verticies by faces 
-    for (auto face : faces) {
+    for (unsigned int x = 0; x < faces.size(); x++) {
+        std::vector<int> face = faces[x];
+        std::vector<int> faceNormal;
+
+        if (facesNormals.size() > 0){
+            faceNormal = facesNormals[x];
+        }
+
         for (unsigned int i = 1; i < face.size()-1; i++) {
             outIndices.push_back(face[0]);
+            if (faceNormal.size() > 0){
+                outNormalsIndices.push_back(faceNormal[0]);
+            }
+
             for (unsigned int j = 0; j < 2; j++){
                 outIndices.push_back(face[i+j]);
+                if (faceNormal.size() > i+j) {
+                    outNormalsIndices.push_back(faceNormal[i+j]);
+                }
             }
         }
     }
